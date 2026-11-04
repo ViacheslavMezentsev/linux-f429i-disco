@@ -2,6 +2,8 @@
 [Русский](CHANGELOG.md)
 
 ## Unreleased
+The flash bootloader now selects 168 MHz. Verified interactive SSH and a 16 KiB SCP round trip after both a push-button reset and a full power cycle.
+
 Verified an SWD-only 168 MHz profile with a full SDRAM test, Linux boot, SSH login and SCP round trip.
 
 Verified boot from internal flash after a power cycle, an interactive SSH terminal and a fresh 16 KiB SCP round trip with matching hashes.
