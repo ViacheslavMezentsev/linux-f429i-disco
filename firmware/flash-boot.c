@@ -40,7 +40,7 @@ static unsigned gyro(unsigned reg, unsigned data)
     R(C+24) = 2;
     return v;
 }
-static uint32_t crc(const unsigned char *p, unsigned len)
+uint32_t boot_crc(const unsigned char *p, unsigned len)
 {
     uint32_t v = ~0u;
     while (len--) {
@@ -50,6 +50,16 @@ static uint32_t crc(const unsigned char *p, unsigned len)
     }
     return ~v;
 }
+uint32_t rng_word(void)
+{
+    unsigned n=2000000;
+    while (!(R(0x50060804)&1) && --n) {}
+    if (!n || (R(0x50060804)&6)) fail("RNG ERROR\r\n");
+    return R(0x50060808);
+}
+#ifdef HOSTKEY_OFFSET
+extern int install_hostkey(unsigned char *);
+#endif
 void boot(void)
 {
     R(RCC+0x30) |= 0x25;
@@ -97,20 +107,28 @@ void boot(void)
     unsigned char *kernel = (void *)0x90000000, *dt = (void *)0x902f0000;
     unsigned long out = IMAGE_SIZE, in = COMP_SIZE;
     if (puff(kernel,&out,compressed,&in) || out!=IMAGE_SIZE || in!=COMP_SIZE ||
-        crc(kernel,out)!=IMAGE_CRC) fail("INFLATE/CRC\r\n");
+        boot_crc(kernel,out)!=IMAGE_CRC) fail("INFLATE/CRC\r\n");
     for (unsigned i=0; i<TREE_SIZE; i++) dt[i]=tree[i];
-    if (crc(dt,TREE_SIZE)!=TREE_CRC) fail("DT CRC\r\n");
+    if (boot_crc(dt,TREE_SIZE)!=TREE_CRC) fail("DT CRC\r\n");
     /* Seed Linux from the hardware RNG; never credit placeholder bytes. */
     R(RCC+0x34) |= 64;
     (void)R(RCC+0x34);
     R(0x50060800) = 4;
     for (unsigned i=0; i<32; i+=4) {
-        unsigned n=2000000;
-        while (!(R(0x50060804)&1) && --n) {}
-        if (!n || (R(0x50060804)&6)) fail("RNG ERROR\r\n");
-        uint32_t v=R(0x50060808);
+        uint32_t v=rng_word();
         for (unsigned j=0; j<4; j++) dt[SEED_OFFSET+i+j]=v>>(8*j);
     }
+#ifdef HOSTKEY_OFFSET
+    unsigned char *key = kernel + HOSTKEY_OFFSET;
+    if (!install_hostkey(key)) fail("HOST KEY ERROR\r\n");
+    say("SSH ED25519 PUBLIC ");
+    const char digits[] = "0123456789abcdef";
+    for (unsigned i = 32; i < 64; ++i) {
+        char pair[] = {digits[key[i] >> 4], digits[key[i] & 15], 0};
+        say(pair);
+    }
+    say("\r\n");
+#endif
     R(0x50060800)=0;
     field(A+0x20,0xf0,0xb0);
     field(A,12,8);
