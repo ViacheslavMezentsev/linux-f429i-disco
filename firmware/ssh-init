@@ -1,0 +1,10 @@
+#!/bin/sh
+export PATH=/bin
+export PS1='disco# '
+mount -t devtmpfs devtmpfs /dev
+mkdir -p /dev/pts
+mount -t devpts devpts /dev/pts
+mount -t proc proc /proc
+inetd /etc/inetd.conf
+echo "F429 SSH ready on port 2222"
+exec /bin/sh -i

@@ -1,0 +1,8 @@
+--- a/drivers/net/ethernet/stmicro/stmmac/common.h
++++ b/drivers/net/ethernet/stmicro/stmmac/common.h
+@@ -54 +54 @@
+-#define DMA_DEFAULT_TX_SIZE	512
++#define DMA_DEFAULT_TX_SIZE	(IS_ENABLED(CONFIG_CPU_V7M) ? DMA_MIN_TX_SIZE : 512)
+@@ -57 +57 @@
+-#define DMA_DEFAULT_RX_SIZE	512
++#define DMA_DEFAULT_RX_SIZE	(IS_ENABLED(CONFIG_CPU_V7M) ? DMA_MIN_RX_SIZE : 512)
