@@ -2,6 +2,8 @@
 [Русский](CHANGELOG.md)
 
 ## Unreleased
+The MAC received two frames with verified FCS using PC4/PC5 without board rework.
+
 Sampled PC4 and PC5 before connecting the RMII receive lines.
 
 Verified that the LAN8720 clocks the MAC through PA1 after configuring the gyroscope to release INT1.
