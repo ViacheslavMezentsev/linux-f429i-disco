@@ -2,6 +2,8 @@
 [Русский](CHANGELOG.md)
 
 ## Unreleased
+Verified an SWD-only 168 MHz profile with a full SDRAM test, Linux boot, SSH login and SCP round trip.
+
 Verified boot from internal flash after a power cycle, an interactive SSH terminal and a fresh 16 KiB SCP round trip with matching hashes.
 
 Linux 6.14.5, Dropbear, SCP and a DEFLATE bootloader fit in internal flash. Verified public-key SSH login and a 16 KiB SCP round trip with matching SHA-256 on the board and host.
