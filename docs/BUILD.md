@@ -128,3 +128,18 @@ F429-DISCO /init: PID=1 userspace reached
 После маркера, на отметке 74,244 с, зарегистрировано предупреждение ядра в kernel/context_tracking.c:128, PID 0 (swapper). Также видны тайм-ауты stm32-rng и неинициализированные часы RTC. Эти сообщения сохранены для разбора при следующем этапе. Проверены запуск PID 1 и вывод в консоль; TC-04 с холодным стартом и uname -r остаётся открытым.
 
 Полный захват COM21 содержит 103 строки (7436 байт), SHA-256 97d7bfe4bed882c85ab77c85394542d985eb97847d91b847e26816121959c73c. После кратковременной потери опроса OpenOCD восстановил и побайтно сверил 8 МиБ SDRAM и 4 КиБ внутренней SRAM. После сброса состояние running, RCC_CFGR=0, FMCEN=0. Flash не программировалась.
+
+### Интерактивный BusyBox для TC-07
+
+К ядру Linux 6.14.5 из TC-06 добавляется initramfs с BusyBox 1.36.1. В нём /init запускает /bin/sh -i, а /bin/sh и /bin/uname указывают на bFLT-бинарник BusyBox. Ввод приходит на PA10, ответ — с PA9. Хост ожидает приглашение disco#, передаёт девять байт команды uname -r с CR и проверяет отдельную строку версии и повторное приглашение.
+
+В WSL распаковать исходники BusyBox и SDK Bootlin из карты источников, вызвать relocate-sdk.sh из каталога распакованного SDK. KERNEL, BUSYBOX и SDK ниже — абсолютные пути к собранному дереву Linux, исходникам BusyBox и SDK.
+
+```sh
+CROSS_COMPILE="$SDK/bin/arm-linux-" sh tools/build-shell-initramfs.sh "$KERNEL" "$BUSYBOX" out
+cpio -itv < out/shell.cpio
+archive=$(realpath out/shell.cpio)
+(cd "$KERNEL" && export ARCH=arm CROSS_COMPILE=arm-none-eabi- && scripts/config --disable HZ_1000 --enable HZ_100 --set-str INITRAMFS_SOURCE "$archive" && make olddefconfig && make -j8 xipImage)
+```
+
+Установлены bFLT BusyBox и его апплет uname. Скрипт проверяет в итоговой конфигурации no-MMU, интерактивный hush, поддержку PS1 и все запрошенные апплеты. Для загрузки используются прежние DTB и карта TC-05. Чтение RCC перед сеансом показало RCC_CR=0x00007d83, RCC_CFGR=0x00000000. Номинальный HSI и HCLK равны 16 МГц, PLL выключен. Паспортный предел STM32F429ZI — 180 МГц в режиме over-drive. Перенастройка PLL потребует пересчитать частоты FMC, refresh SDRAM и делители периферии. Частота отладочного SWD 950 кГц независима от HCLK.

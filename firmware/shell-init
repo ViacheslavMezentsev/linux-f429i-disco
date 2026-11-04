@@ -1,0 +1,4 @@
+#!/bin/sh
+export PATH=/bin
+export PS1='disco# '
+exec /bin/sh -i
