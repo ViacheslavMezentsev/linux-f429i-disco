@@ -4,3 +4,5 @@
 The project aims to boot embedded Linux on the Discovery board and verify it on hardware. Linux 6.14.5 has booted from SDRAM via SWD. The kernel launched /init from the built-in initramfs. The BusyBox hush shell accepts commands over COM21. Running uname -r returned 6.14.5. The owner selects the bootloader, kernel and root filesystem.
 
 Run `make check` in WSL. See the [build and SWD record](docs/BUILD.md), [specification](docs/requirements/TECHNICAL_SPECIFICATION_LINUX.md), [decisions](TODO.md) and [sources](docs/SOURCES.md) (Russian).
+
+[Tested top package for installation over SCP](artifacts/armv7m-bflt/busybox-top/1.36.1-r1/README.md)

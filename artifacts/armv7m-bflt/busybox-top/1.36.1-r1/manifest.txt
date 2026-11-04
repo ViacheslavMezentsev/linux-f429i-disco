@@ -1,0 +1,14 @@
+utility=top
+provider=BusyBox 1.36.1
+target=STM32F429I-DISCO, Cortex-M4/Thumb, Linux no-MMU, bFLT v4
+toolchain=Bootlin armv7m--uclibc--stable-2024.05-1, uClibc-ng 1.0.50 lowmem
+license=GPL-2.0 (BusyBox); see docs/SOURCES.md and the corresponding libc and toolchain sources
+source_busybox_sha256=b8cc24c9574d809e7279c3be349795c5d5ceb6fdf19ca709f80cde50e47de314
+bytes=103556
+test=Linux 6.14.5, SSH user UID 1000, three PTYs with 3 frames and q
+revision=1.36.1-r1
+recipe_commit=d816489
+recipe=tools/build-lowmem-busybox.sh
+config=busybox.config and firmware/uclibc-lowmem.config
+uclibc_commit=ecbc412d0d93c8b7b77bec6539b290c9da5401cf
+top_sha256=96fbfb381f9d5c8e7bae7ee66b3d1d50a15de6de5e70db28355804751d98bc41
