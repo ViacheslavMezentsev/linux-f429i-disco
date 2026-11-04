@@ -2,6 +2,8 @@
 [Русский](CHANGELOG.md)
 
 ## Unreleased
+Added an optional 40×40 text fbdev and lcd-text for the demo image. Verified TCC output on SPI5 with DMA, a 0.416 s full-screen fill and concurrent Ethernet traffic.
+
 Added a Linux GPIO probe for 5×8 text on the ILI9341. Windows received 36 of 36 ping replies and PG11 retained AF11. Host checks now build the SRAM probe without installing GCC via apt.
 
 Enabled interactive top in the compact BusyBox build. Verified screen refresh, q to exit and shell memory on the STM32 over SSH.
