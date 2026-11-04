@@ -2,6 +2,8 @@
 [Русский](CHANGELOG.md)
 
 ## Unreleased
+Sampled PC4 and PC5 before connecting the RMII receive lines.
+
 Verified that the LAN8720 clocks the MAC through PA1 after configuring the gyroscope to release INT1.
 
 Added specification 1.0, an offline check of the linked Cortex-M4 ELF and a record of the MCU identification over SWD.
