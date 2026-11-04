@@ -20,3 +20,7 @@
 
 Для загрузчика используется contrib/puff/puff.c и puff.h из zlib 1.3.1, SHA-256 архива 9a93b2b7dfdac77ceba5a558a580e74667dd6fede4585b91eefb60f03b72df23, лицензия zlib. Исходники распаковываются отдельно при сборке. [Архив zlib](https://zlib.net/fossils/zlib-1.3.1.tar.gz)
 Для сетевого профиля SSH используется дополнительная поправка к drivers/net/ethernet/stmicro/stmmac/common.h в том же Linux 6.14.5. Она выбирает определённый драйвером минимум DMA_MIN_RX_SIZE и DMA_MIN_TX_SIZE для CPU_V7M.
+
+Для TC-11 компактная uClibc-ng v1.0.50 собрана из ecbc412d0d93c8b7b77bec6539b290c9da5401cf, конфигурация выведена из bits/uClibc_config.h указанного Bootlin SDK. Условия приведены в COPYING.LIB и лицензиях исходных компонентов. [uClibc-ng](https://github.com/wbx-github/uclibc-ng/tree/ecbc412d0d93c8b7b77bec6539b290c9da5401cf)
+
+Экспериментальный генератор Thumb взят из arm-gen.c и tcc.h форка TinyCC, SHA d9c7e2e1a4db0107f0a7cdf00791d56961ee813a. Локальный патч добавляет вызовы puts для статических строк. Компилятор статически использует libc_nano.a и libgcc.a из GNU Arm Embedded Toolchain 10-2020-q4-major. Для поставки учитывать лицензии TinyCC (LGPL по заголовкам), newlib и GCC Runtime Library Exception по компонентам. [Исходный генератор Thumb](https://github.com/gfwilliams/tinycc/tree/d9c7e2e1a4db0107f0a7cdf00791d56961ee813a)

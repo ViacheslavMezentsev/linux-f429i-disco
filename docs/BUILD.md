@@ -280,3 +280,30 @@ Windows OpenOCD 0.12.0, внешний ST-LINK, SWD 950 кГц. Тот же ус
 04.11.2026. Образ 1 818 563 байта (SHA-256 0e0e65d8313997977f512cbf048e6004bb886733b709c53a6555fab9d3585124) записан Windows OpenOCD 0.12.0 через внешний ST-LINK, SWD 950 кГц. Обратное чтение Flash совпало с BIN. После кнопки RESET COM21 вновь показал PA1 RELEASED и WAIT REF_CLK. До подключения тактового провода прочитаны PLLCFGR=0x27005410, CFGR=0x940a и SDRTR=0xa18. После подключения LAN8720 загрузился Linux. В интерактивном SSH на порту 2222 uname -r вернул 6.14.5, exit штатно закрыл сеанс. SCP передал 16 384 байта в /tmp и обратно, совпали оба файла (cmp) и три SHA-256: 9493be11f1334ed2d633cefc5c5c5d2dc462c2b571816bcb1b479b0b9893dba6. Этот цикл выполнен с сохранением питания.
 
 Холодный старт той же прошивки подтверждён отдельно после полного выключения и включения питания владельцем. COM21 переоткрылся и принял WAIT REF_CLK. До подключения провода Windows ST-LINK прочитал CTRL_REG3=0x30, PLLCFGR=0x27005410, CFGR=0x940a, SDRTR=0xa18. После подключения REF_CLK Linux поднял eth0, адрес 192.168.68.73. В SSH-терминале uname -r вернул 6.14.5; exit закрыл сеанс. SCP: 16 384 байта, путь /tmp/tc09-2c538a2fd7481588.bin, три совпавших SHA-256 2c538a2fd74815887b81bbd8e5af60345aef6733fba93c9fff7e81a48455e15f, cmp прошёл. В журнале сохранились известные тайм-ауты драйвера stm32-rng и сообщения об отсутствующем /var/log/wtmp. Плату оставили работающей.
+
+### TC-11. Компактный BusyBox и TCC после холодного старта
+
+Для профиля нужны сборочное дерево Linux 6.14.5, исходники BusyBox 1.36.1, базовый SSH-профиль с его архивным манифестом, Bootlin SDK, arm-none-eabi-gcc с newlib-nano и две исходные Git-копии из карты источников. Задайте абсолютные пути в переменных ниже. Выберите пустые выходные каталоги. Укажите BusyBox-конфигурацию из сборки SSH с inetd, cat и sha256sum.
+
+```sh
+sh tools/build-lowmem-busybox.sh "$UCLIBC_GIT" "$BUSYBOX_SRC" "$SSH_BUILD/busybox/.config" "$SDK" "$BB_OUT"
+sh tools/build-thumb-tcc.sh "$TCC_GIT" "$SDK" "$TCC_OUT"
+sh tools/build-tcc-initramfs.sh "$KERNEL/usr/gen_init_cpio" "$SSH_BUILD/archive.list" \
+    "$BB_OUT/busybox/busybox_unstripped" "$TCC_OUT/tcc" "$PRIVATE_OUT/tcc.cpio"
+"$KERNEL/scripts/config" --file "$KERNEL/.config" --set-str INITRAMFS_SOURCE "$PRIVATE_OUT/tcc.cpio"
+make -C "$KERNEL" ARCH=arm CROSS_COMPILE=arm-none-eabi- olddefconfig
+make -C "$KERNEL" ARCH=arm CROSS_COMPILE=arm-none-eabi- -j4 xipImage
+sh tools/build-flash-image.sh "$KERNEL/arch/arm/boot/xipImage" "$DTB_WITHOUT_SEED" \
+    "$ZLIB_ARCHIVE" "$KERNEL/scripts/dtc/dtc" "$PRIVATE_OUT/flash"
+```
+
+Полный проверенный BIN занял 1 848 067 байт из 2 097 152. SHA-256 образа b4a48fded160ec2882da2925464acd07632102a7a3bce9d77f2df088df16f459. Образ содержит закрытый ключ узла SSH и хранится локально. Даты сборки и экземпляр ключа влияют на контрольную сумму. Windows OpenOCD 0.12.0, внешний ST-LINK, SWD 950 кГц. Образ прочитан обратно и побайтно сверен, рабочая SRAM проверена. Для холодного старта снять REF_CLK, выключить и включить Discovery, дождаться PA1 RELEASED и WAIT REF_CLK, затем подключить REF_CLK к PA1 без нового сброса.
+
+После холодного старта проверены Linux 6.14.5, 168/84 МГц, eth0 100 Мбит/с full duplex и TC-09 (16 КиБ в обе стороны, SHA-256 72d668f3e99d805e303ea9dd23f1efe8e5cdb392c85a2e9e4c81706be270199d). Компактный BusyBox занимает 94 884 байта, TCC — 84 388 байт. В SSH-оболочке выполните:
+
+```sh
+echo 'int puts(const char *); int main(void){puts("Hello, World!");return 0;}' > /tmp/hello.c
+/bin/tcc /tmp/hello.c /tmp/hello-$$ && /tmp/hello-$$
+```
+
+Драйвер принимает исходник и новое имя выходного файла. Проверены целочисленная main и puts со статической строкой. Проверка TC-11 сравнила stdout с 14 байтами «Hello, World!» и LF и подтвердила статус 0. Профиль libc компактной оболочки исключает pthread, локали и поддержку floating point. Это свойство данной сборки BusyBox.
