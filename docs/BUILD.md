@@ -94,3 +94,18 @@ sha256sum /tmp/f429-first-boot.dtb
 Через 45 секунд отладчик остановил ядро в обработчике периодического таймера (PC=0x9003fee4, VTOR=0x9030c400). Последняя полученная строка приведена выше. Этот прогон подтверждает раннюю загрузку. Образ собран без initramfs. Холодный старт, /init и команда uname -r остаются отдельной проверкой TC-04.
 
 После записи журнала OpenOCD восстановил и побайтно сверил 8 МиБ SDRAM со снимком после инициализации FMC и 4 КиБ внутренней SRAM со снимком перед запуском. После системного сброса MCU вернулся в running с FMCEN=0. Flash не программировалась.
+
+### Сборка минимального /init для Cortex-M4 (TC-06)
+
+Запустить из корня репозитория в WSL. Переменная KERNEL указывает на дерево Linux 6.14.5 после пробной сборки xipImage, в котором уже есть usr/gen_init_cpio. Сборка использует тот же no-MMU профиль и карту памяти, что и TC-05.
+
+```sh
+export ARCH=arm CROSS_COMPILE=arm-none-eabi-
+KERNEL=/path/to/built/linux-6.14.5
+sh tools/build-initramfs.sh "$KERNEL" out
+cpio -itv < out/initramfs.cpio
+archive=$(realpath out/initramfs.cpio)
+(cd "$KERNEL" && scripts/config --disable HZ_1000 --enable HZ_100 --set-str INITRAMFS_SOURCE "$archive" && make olddefconfig && make -j8 xipImage)
+```
+
+Архив newc содержит /dev/console (5:1) и исполняемый /init размером 148 байт. Код Thumb для ARM EABI позиционно независим и упакован в bFLT v4 с входом 0x41 и стеком 4096 байт. Процесс проверяет getpid(), отправляет контрольную строку через write(1, ...) и остаётся в pause(). Драйвер USART и настройки терминала берутся из ядра и DTB предыдущего запуска. Для опыта при HCLK 16 МГц задан CONFIG_HZ=100. Это частота системного тика Linux; SWD работает на 950 кГц, UART — на 115200 бод.
