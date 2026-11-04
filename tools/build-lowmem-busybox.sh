@@ -24,5 +24,8 @@ yes '' | make -C libc oldconfig
 make -C libc -j"${JOBS:-4}"
 make -C libc install PREFIX="$out/sysroot"
 sed "s|^CONFIG_SYSROOT=.*|CONFIG_SYSROOT=\"$out/sysroot\"|" "$config" > busybox/.config
+# Replace top settings inherited from old SSH configs before running Kconfig.
+sed -i -E '/^(# )?CONFIG_(TOP|FEATURE_TOP[A-Z_]*)[ =]/d' busybox/.config
+cat "$fw/busybox-top.config" >> busybox/.config
 yes '' | make -C "$bb" O="$out/busybox" oldconfig
 make -C "$bb" O="$out/busybox" -j"${JOBS:-4}" busybox_unstripped

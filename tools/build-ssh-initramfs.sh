@@ -98,6 +98,7 @@ if "$demo"; then
     echo 'exec /bin/dropbear -i -w -r /etc/dropbear/hostkey 2>/dev/console' > session
     python3 -c 'from pathlib import Path; Path("placeholder").write_bytes(b"\x00\x00\x00\x0bssh-ed25519\x00\x00\x00\x40" + b"F429 HOST KEY PLACEHOLDER".ljust(64,b"!"))'
     cat >> archive.list <<EOF
+slink /bin/top busybox 0777 0 0
 dir /home 0755 0 0
 dir /home/user 0700 1000 1000
 file /etc/dropbear/hostkey placeholder 0600 0 0
