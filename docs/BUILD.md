@@ -139,7 +139,25 @@ F429-DISCO /init: PID=1 userspace reached
 CROSS_COMPILE="$SDK/bin/arm-linux-" sh tools/build-shell-initramfs.sh "$KERNEL" "$BUSYBOX" out
 cpio -itv < out/shell.cpio
 archive=$(realpath out/shell.cpio)
-(cd "$KERNEL" && export ARCH=arm CROSS_COMPILE=arm-none-eabi- && scripts/config --disable HZ_1000 --enable HZ_100 --set-str INITRAMFS_SOURCE "$archive" && make olddefconfig && make -j8 xipImage)
+(cd "$KERNEL" && export ARCH=arm CROSS_COMPILE=arm-none-eabi- && scripts/config --disable HZ_1000 --enable HZ_100 --disable NO_HZ_IDLE --enable HZ_PERIODIC --disable PREEMPT --enable PREEMPT_NONE --set-str INITRAMFS_SOURCE "$archive" && make olddefconfig && make -j8 xipImage)
 ```
 
-Установлены bFLT BusyBox и его апплет uname. Скрипт проверяет в итоговой конфигурации no-MMU, интерактивный hush, поддержку PS1 и все запрошенные апплеты. Для загрузки используются прежние DTB и карта TC-05. Чтение RCC перед сеансом показало RCC_CR=0x00007d83, RCC_CFGR=0x00000000. Номинальный HSI и HCLK равны 16 МГц, PLL выключен. Паспортный предел STM32F429ZI — 180 МГц в режиме over-drive. Перенастройка PLL потребует пересчитать частоты FMC, refresh SDRAM и делители периферии. Частота отладочного SWD 950 кГц независима от HCLK.
+Установлены bFLT BusyBox и его апплет uname. Скрипт проверяет в итоговой конфигурации no-MMU, интерактивный hush, поддержку PS1 и все запрошенные апплеты. Для загрузки применить карту TC-05. При подготовке DTB по инструкции TC-05 добавить nohlt в конец bootargs (после panic=0). Это включает непрерывный опрос вместо WFI в idle для диагностического прогона. Чтение RCC перед сеансом показало RCC_CR=0x00007d83, RCC_CFGR=0x00000000. Номинальный HSI и HCLK равны 16 МГц, PLL выключен. Паспортный предел STM32F429ZI — 180 МГц в режиме over-drive. Перенастройка PLL потребует пересчитать частоты FMC, refresh SDRAM и делители периферии. Частота отладочного SWD 950 кГц независима от HCLK.
+
+### Результат TC-07 на MB1075 B-01
+
+Первый образ на прежнем профиле PREEMPT и NO_HZ_IDLE дошёл до приглашения. После отправки команды появился HardFault (INVSTATE) в PID 0 / swapper, ответа не было. Отдельная проверка показала, что Windows может отправить 0x55 на COM21 и получить это значение в регистре USART1 по линии PA10.
+
+Во втором запуске с тем же BusyBox изменены модель вытеснения, режим тика и поведение idle. В конфигурации HZ_PERIODIC, HZ=100, PREEMPT_NONE, TINY_RCU и с nohlt приглашение, ответ и повторное приглашение получены на Windows. Изменения проверялись совместно; точная причина первого сбоя остаётся открытой. Это профиль аппаратной диагностики, пригодность для энергосбережения не проверялась.
+
+```text
+BusyBox v1.36.1 (2026-11-04 12:32:43 +05) hush - the humble shell
+
+disco# uname -r
+6.14.5
+disco#
+```
+
+TX из Windows после приглашения: 75 6e 61 6d 65 20 2d 72 0d. На момент отправки получено 6618 байт. В последующих байтах RX обнаружены эхо, отдельная строка версии и новое приглашение. Результат совпал с include/config/kernel.release. Полный RX — 6643 байта, SHA-256 391c06c1777aefd1403fe876501a23d1aeb1ca031b1f9185f5555490f4dfbcff. SHA-256 ядра 8dae9df00d852a888af6c531632c6fda443a7e2a5d879fc086a5fff4c897c3f3; DTB 570fc9d82d04c790a0475c4906ad17e6c8073624e82c82ca37d2e97e93dff791. Исполнение из SDRAM через SWD; для TC-04 нужен отдельный холодный старт.
+
+После опыта OpenOCD побайтно сверил восстановленные 8 МиБ внешней SDRAM и 4 КиБ внутренней SRAM. После сброса подтверждены running, RCC_CFGR=0 и FMCEN=0.

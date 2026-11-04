@@ -13,3 +13,5 @@ Verified all 8 MiB of external SDRAM and built a Linux 6.14.5 kernel and DTB for
 Linux 6.14.5 booted from SDRAM on the Discovery board via SWD. COM21 captured the early kernel log for TC-05.
 
 TC-06: the Discovery board ran the built-in initramfs /init. Windows captured its PID 1 confirmation on COM21.
+
+TC-07 passed. Windows sent uname -r to BusyBox hush over COM21 and received 6.14.5 and a new prompt.
