@@ -161,3 +161,22 @@ disco#
 TX из Windows после приглашения: 75 6e 61 6d 65 20 2d 72 0d. На момент отправки получено 6618 байт. В последующих байтах RX обнаружены эхо, отдельная строка версии и новое приглашение. Результат совпал с include/config/kernel.release. Полный RX — 6643 байта, SHA-256 391c06c1777aefd1403fe876501a23d1aeb1ca031b1f9185f5555490f4dfbcff. SHA-256 ядра 8dae9df00d852a888af6c531632c6fda443a7e2a5d879fc086a5fff4c897c3f3; DTB 570fc9d82d04c790a0475c4906ad17e6c8073624e82c82ca37d2e97e93dff791. Исполнение из SDRAM через SWD; для TC-04 нужен отдельный холодный старт.
 
 После опыта OpenOCD побайтно сверил восстановленные 8 МиБ внешней SDRAM и 4 КиБ внутренней SRAM. После сброса подтверждены running, RCC_CFGR=0 и FMCEN=0.
+
+### Сетевой профиль LAN8720 для TC-08
+
+Начать с собранного профиля TC-07 с действующим путём к shell.cpio. В каталоге исходников Linux задать REPO равным абсолютному пути проекта. Файл /tmp/f429-first-boot.dts создаётся по инструкции TC-05 выше.
+
+```sh
+export ARCH=arm CROSS_COMPILE=arm-none-eabi-
+patch -p1 < "$REPO/firmware/linux-6.14.5-stmmac-rx-align.patch"
+scripts/kconfig/merge_config.sh -m .config "$REPO/firmware/linux-lan8720.config"
+make olddefconfig
+make -j8 xipImage
+test "$(wc -c < arch/arm/boot/xipImage)" -le $((0x2f0000))
+cat /tmp/f429-first-boot.dts "$REPO/firmware/lan8720.dtsi" |
+  scripts/dtc/dtc -q -I dts -O dtb -o /tmp/f429-lan8720.dtb
+```
+
+Профиль задаёт плате MAC 02:42:f4:29:00:01 и IPv4 198.18.42.2/30 для изолированного сегмента. Для ПК предусмотрен 198.18.42.1. PD2 и PE3 обслуживает mdio-gpio, PHY имеет адрес 1. Ядро настраивает IPv4 при старте через ip= в bootargs.
+
+На MB1075 B-01 до подключения REF_CLK освободить PA1 по протоколу Ethernet. При подключённом такте держать это состояние гироскопа на протяжении сеанса. Для диагностического старта FMC сначала инициализирован на штатных 16 МГц как в TC-05. После проверки загрузки в SDRAM выбран PLL от HSI с PLLM=16, PLLN=336, PLLP=4. HCLK и PCLK2 равны 84 МГц, PCLK1 и SDCLK равны 42 МГц. Для SDRAM выставлен COUNT=636 (42 МГц × 64 мс / 4096 − 20, округление вниз), для раннего USART1 BRR=729. Переход к ядру выполнен из остановленного Thread mode без аппаратного сброса платы.

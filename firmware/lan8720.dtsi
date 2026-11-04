@@ -1,0 +1,44 @@
+/* Append to the diagnostic TC-07 DTS before compiling it with dtc. */
+&{/soc/pinctrl@40020000} {
+	rmii_pins: rmii-pins {
+		pins {
+			/* AF11: PA1, PA7, PC4, PC5, PG11, PG13, PG14 */
+			pinmux = <0x010c 0x070c 0x240c 0x250c 0x6b0c 0x6d0c 0x6e0c>;
+			slew-rate = <3>;
+			bias-disable;
+			drive-push-pull;
+		};
+	};
+};
+
+/ {
+	mdio {
+		compatible = "virtual,mdio-gpio";
+		#address-cells = <1>;
+		#size-cells = <0>;
+		/* MDC on PE3, MDIO on PD2 */
+		gpios = <&{/soc/pinctrl@40020000/gpio@40021000} 3 0>,
+			<&{/soc/pinctrl@40020000/gpio@40020c00} 2 0>;
+		lan8720: ethernet-phy@1 {
+			reg = <1>;
+		};
+	};
+};
+
+&{/soc/ethernet@40028000} {
+	status = "okay";
+	pinctrl-names = "default";
+	pinctrl-0 = <&rmii_pins>;
+	phy-mode = "rmii";
+	phy-handle = <&lan8720>;
+	local-mac-address = [02 42 f4 29 00 01];
+};
+
+&{/leds} { status = "disabled"; };
+&{/soc/usb@40040000} { status = "disabled"; };
+&{/soc/display-controller@40016800} { status = "disabled"; };
+&{/soc/spi@40015000} { status = "disabled"; };
+
+&{/chosen} {
+	bootargs = "earlycon console=ttySTM0,115200n8 ignore_loglevel clk_ignore_unused panic=0 nohlt ip=198.18.42.2:::255.255.255.252:disco:eth0:off";
+};

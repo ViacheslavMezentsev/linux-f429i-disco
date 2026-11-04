@@ -1,0 +1,17 @@
+--- a/drivers/net/ethernet/stmicro/stmmac/stmmac_main.c
++++ b/drivers/net/ethernet/stmicro/stmmac/stmmac_main.c
+@@ -5651,1 +5651,13 @@ static int stmmac_rx
+-			skb_reserve(skb, head_pad_len);
++			/*
++			 * The STM32F4 DMA writes word-aligned frames. Move the
++			 * Ethernet header into the reserved headroom so that IP
++			 * starts on a word boundary on Cortex-M.
++			 */
++			if (IS_ENABLED(CONFIG_CPU_V7M) && NET_IP_ALIGN &&
++			    !stmmac_xdp_is_enabled(priv) &&
++			    head_pad_len >= NET_IP_ALIGN) {
++				head_pad_len -= NET_IP_ALIGN;
++				memmove(skb->data + head_pad_len, ctx.xdp.data,
++					buf1_len);
++			}
++			skb_reserve(skb, head_pad_len);

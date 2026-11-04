@@ -12,4 +12,6 @@
 | [BusyBox 1.36.1](https://busybox.net/downloads/busybox-1.36.1.tar.bz2) | shell/hush.c, coreutils/uname.c, архив SHA-256 b8cc24c9574d809e7279c3be349795c5d5ceb6fdf19ca709f80cde50e47de314 | GPL-2.0. Собирается из исходников отдельно для initramfs. |
 | [Bootlin ARMv7-M uClibc](https://toolchains.bootlin.com/downloads/releases/toolchains/armv7m/tarballs/) | armv7m--uclibc--stable-2024.05-1.tar.xz, SHA-256 9891f5a43d1002a652353064e6543a1371c795938ecb595dd2f47a2d0ecc1e62 | SDK хоста, условия по компонентам. При поставке статического BusyBox отдельно учитывать включённую uClibc. |
 
+Для TC-08 патч в firmware/linux-6.14.5-stmmac-rx-align.patch применяется к drivers/net/ethernet/stmicro/stmmac/stmmac_main.c из архива Linux 6.14.5 с указанным выше SHA-256. Лицензия исходного файла по SPDX — GPL-2.0-only. Распиновка в firmware/lan8720.dtsi проверена по схеме MB1075 B-01 и на плате.
+
 Для собственных материалов предложена MIT, решение принимает владелец. При выборе Linux, загрузчика, rootfs и бинарных прошивок инвентаризировать каждый компонент отдельно: версия или SHA, исходный путь, лицензия и условия поставки. Инструменты ST на ПК установлены отдельно.
