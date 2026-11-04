@@ -69,14 +69,25 @@ void boot(void)
     say("PA1 RELEASED\r\n");
     if (sdram_init()) fail("FMC\r\n");
     field(0x40013800,0xc00,0x400);
+    /* Keep bank 2 in self-refresh while changing its clock from 8 to 84 MHz. */
+    R(0xa0000150) = (1u << 3) | 5;
+    while ((R(0xa0000158) & 0x38) != 8) {}
+    R(RCC+0x40) |= 1u << 28; /* PWR clock */
+    (void)R(RCC+0x40);
+    field(0x40007000, 3u << 14, 3u << 14); /* Voltage scale 1 */
     R(0x40023c00) = 5;
-    R(RCC+4) = 0x27015410;
-    field(RCC+8,0xfc00,0x1000);
+    if ((R(0x40023c00) & 7) != 5) fail("FLASH LATENCY\r\n");
+    /* HSI 16 MHz, PLLM=16, PLLN=336, PLLP=2, PLLQ=7. */
+    R(RCC+4) = 0x27005410;
+    field(RCC+8,0xfc00,0x9400); /* APB1 /4, APB2 /2 */
     R(RCC) |= 0x01000000;
     while (!(R(RCC) & 0x02000000)) {}
+    while (!(R(0x40007004) & (1u << 14))) {}
     field(RCC+8,3,2);
     while ((R(RCC+8)&12) != 8) {}
-    R(0xa0000154) = 1272;
+    R(0xa0000154) = 1292u << 1; /* 84 MHz * 64 ms / 4096 - 20 */
+    R(0xa0000150) = 1u << 3; /* Normal mode, bank 2 */
+    while (R(0xa0000158) & 0x38) {}
     R(0x40011008) = 729;
     R(0xe000ed98) = 0;
     R(0xe000ed9c) = 0x90000000;
