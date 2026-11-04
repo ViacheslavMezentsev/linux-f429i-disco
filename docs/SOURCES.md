@@ -15,3 +15,8 @@
 Для TC-08 патч в firmware/linux-6.14.5-stmmac-rx-align.patch применяется к drivers/net/ethernet/stmicro/stmmac/stmmac_main.c из архива Linux 6.14.5 с указанным выше SHA-256. Лицензия исходного файла по SPDX — GPL-2.0-only. Распиновка в firmware/lan8720.dtsi проверена по схеме MB1075 B-01 и на плате.
 
 Для собственных материалов предложена MIT, решение принимает владелец. При выборе Linux, загрузчика, rootfs и бинарных прошивок инвентаризировать каждый компонент отдельно: версия или SHA, исходный путь, лицензия и условия поставки. Инструменты ST на ПК установлены отдельно.
+
+Для профиля SSH взят Dropbear DROPBEAR_2026.94, git SHA 28216cd9af822732a1549b78621c2ea9a76a0fe5, src/svr-main.c, src/scp.c и встроенные libtomcrypt/libtommath. Условия по компонентам приведены в LICENSE исходного дерева. [Исходники Dropbear](https://github.com/mkj/dropbear/tree/28216cd9af822732a1549b78621c2ea9a76a0fe5)
+
+Для загрузчика используется contrib/puff/puff.c и puff.h из zlib 1.3.1, SHA-256 архива 9a93b2b7dfdac77ceba5a558a580e74667dd6fede4585b91eefb60f03b72df23, лицензия zlib. Исходники распаковываются отдельно при сборке. [Архив zlib](https://zlib.net/fossils/zlib-1.3.1.tar.gz)
+Для сетевого профиля SSH используется дополнительная поправка к drivers/net/ethernet/stmicro/stmmac/common.h в том же Linux 6.14.5. Она выбирает определённый драйвером минимум DMA_MIN_RX_SIZE и DMA_MIN_TX_SIZE для CPU_V7M.

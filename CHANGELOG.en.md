@@ -2,6 +2,8 @@
 [Русский](CHANGELOG.md)
 
 ## Unreleased
+Linux 6.14.5, Dropbear, SCP and a DEFLATE bootloader fit in internal flash. Verified public-key SSH login and a 16 KiB SCP round trip with matching SHA-256 on the board and host.
+
 Verified ICMP echo over eth0 on Linux 6.14.5 with the LAN8720. Added the diagnostic configuration and Cortex-M receive alignment fix.
 
 The MAC received two frames with verified FCS using PC4/PC5 without board rework.

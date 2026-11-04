@@ -42,6 +42,7 @@ done < "$fw/busybox-shell.config"
 for feature in INETD MOUNT CAT SHA256SUM HUSH_READ HUSH_IF HUSH_TEST TEST MKDIR SLEEP; do
     "$kernel/scripts/config" --file "$out/busybox/.config" --enable "$feature"
 done
+"$kernel/scripts/config" --file "$out/busybox/.config" --disable FEATURE_EDITING_FANCY_PROMPT
 yes '' | make -C "$busybox" O="$out/busybox" oldconfig
 make -C "$busybox" O="$out/busybox" -j"${JOBS:-4}" busybox_unstripped
 printf '%s\n' '2222 stream tcp nowait root /bin/sh sh /etc/dropbear/session' > inetd.conf
