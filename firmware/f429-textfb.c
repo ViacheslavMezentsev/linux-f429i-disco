@@ -11,13 +11,17 @@
 
 #define WIDTH (LCD_COLS * 6)
 #define HEIGHT (LCD_ROWS * 8)
+#define FILL_ROWS 8
+#define FILL_BYTES (WIDTH * FILL_ROWS * 2)
+static_assert(HEIGHT % FILL_ROWS == 0);
+
 struct panel {
 	struct spi_device *spi;
 	struct gpio_desc *dc;
 	struct mutex lock;
 	struct lcd_colors colors;
 	u8 cells[LCD_ROWS * LCD_COLS];
-	u8 *scan; /* DMA-safe pixel row, allocated separately */
+	u8 *scan; /* DMA-safe scratch shared by fills and glyph rows */
 };
 
 static int command(struct panel *p, u8 op, const u8 *args, size_t n)
@@ -52,9 +56,9 @@ static int clear_panel(struct panel *p, struct lcd_colors colors)
 {
 	int ret = window(p, 0, 0, WIDTH, HEIGHT);
 	unsigned x, y;
-	for (x = 0; x < WIDTH; x++) pixel(p, x, colors.bg);
-	for (y = 0; !ret && y < HEIGHT; y++)
-		ret = spi_write(p->spi, p->scan, WIDTH*2);
+	for (x = 0; x < WIDTH * FILL_ROWS; x++) pixel(p, x, colors.bg);
+	for (y = 0; !ret && y < HEIGHT; y += FILL_ROWS)
+		ret = spi_write(p->spi, p->scan, FILL_BYTES);
 	if (!ret) {
 		p->colors = colors;
 		memset(p->cells, ' ', sizeof(p->cells));
@@ -147,7 +151,7 @@ static int text_probe(struct spi_device *spi)
 	if (!info) return -ENOMEM;
 	p = info->par;
 	p->spi = spi;
-	p->scan = devm_kmalloc(&spi->dev, WIDTH*2, GFP_KERNEL);
+	p->scan = devm_kmalloc(&spi->dev, FILL_BYTES, GFP_KERNEL);
 	if (!p->scan) { ret = -ENOMEM; goto fail; }
 	p->dc = devm_gpiod_get(&spi->dev, "dc", GPIOD_OUT_HIGH);
 	if (IS_ERR(p->dc)) { ret = PTR_ERR(p->dc); goto fail; }

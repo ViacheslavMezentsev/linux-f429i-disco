@@ -2,6 +2,8 @@
 [Русский](CHANGELOG.md)
 
 ## Unreleased
+Send eight LCD rows per full-screen fill transfer. At the same SPI5 clock, median fill time dropped from 420 to 161 ms and TX DMA interrupts from 320 to 40.
+
 Added an optional 40×40 text fbdev and lcd-text for the demo image. Verified TCC output on SPI5 with DMA, a 0.416 s full-screen fill and concurrent Ethernet traffic.
 
 Added a Linux GPIO probe for 5×8 text on the ILI9341. Windows received 36 of 36 ping replies and PG11 retained AF11. Host checks now build the SRAM probe without installing GCC via apt.
