@@ -54,3 +54,43 @@ make -j8 xipImage st/stm32f429-disco.dtb
 
 ### Полный проход SDRAM, 04.11.2026
 Полный тест прошёл при SDCLK 8 МГц. Cortex-M4 записал и прочёл все 2 097 152 слова SDRAM (0xD0000000–0xD07FFFFF) с адресно-зависимым шаблоном и его инверсией. Проверено 4 194 304 результата, расхождений нет. Все 8 МиБ восстановлены из копии после инициализации FMC и побайтно сверены. Также восстановлены 4 КиБ внутренней SRAM, после сброса ядро running и FMCEN=0. Рабочая скорость внешнего ST-LINK через Windows — 950 кГц.
+
+### Первый запуск Linux на COM21 (TC-05)
+
+04.11.2026 на MB1075 B-01 ядро Linux 6.14.5 из предыдущей сборки запущено в привилегированном Thread mode через внешний ST-LINK, OpenOCD 0.12.0 для Windows, 950 кГц. Открытый до запуска COM21 записал 38 строк (2908 байт, включая CRLF). SHA-256 исходных байтов 7c58638f0ab7ec98d0624bb5f52288e0386b591bb999378e047ae9f52664c63b. Версия в баннере совпала с include/config/kernel.release.
+
+```text
+[    0.000000] Booting Linux on physical CPU 0x0
+[    0.000000] Linux version 6.14.5 (user@worktool) (arm-none-eabi-gcc (GNU Arm Embedded Toolchain 10-2020-q4-major) 10.2.1 20201103 (release), GNU ld (GNU Arm Embedded Toolchain 10-2020-q4-major) 2.35.1.20201028) #1 PREEMPT Wed Nov  4 11:33:30 +05 2026
+[    0.000000] CPU: ARMv7-M [410fc241] revision 1 (ARMv7M), cr=00000000
+[    0.000000] OF: fdt: Machine model: STMicroelectronics STM32F429i-DISCO board
+[    0.000000] earlycon: stm32 at MMIO 0x40011000 (options '115200n8')
+[    0.093326] /soc/timers@40000c00: STM32 clockevent driver initialized (32 bits)
+```
+
+**Карта памяти и вход.** После инициализации FMC при HCLK 16 МГц, SDCLK 8 МГц установлен SWP_FMC=1 в SYSCFG_MEMRMP. Банк 2 доступен с 0x90000000. Символ stext связан по этому адресу.
+
+| Объект | Адрес | Размер |
+| --- | --- | --- |
+| xipImage (SHA-256 c0002fb4322fe601d9caae6fcad861e1046b247afa25ea8379618659844566fb) | 0x90000000 | 2 239 112 байт |
+| DTB первого запуска (SHA-256 1a220025159f06a98cf4507f4591839853779d4822f1d5f6d38cdd98636b402f) | 0x902F0000 | 19 624 байта |
+| Рабочая RAM, включая .data, .bss и таблицу векторов ядра | 0x90300000–0x907FFFFF | 5 МиБ |
+
+Для воспроизведения DTB использованы следующие команды из каталога собранного ядра Linux 6.14.5.
+
+```sh
+dtc=scripts/dtc/dtc
+"$dtc" -q -I dtb -O dts arch/arm/boot/dts/st/stm32f429-disco.dtb -o /tmp/f429-stock.dts
+sed -e 's@root=/dev/ram@earlycon console=ttySTM0,115200n8 ignore_loglevel clk_ignore_unused panic=0@' \
+    -e 's/memory@90000000/memory@90300000/' \
+    -e 's/<0x90000000 0x800000>/<0x90300000 0x500000>/' \
+    /tmp/f429-stock.dts > /tmp/f429-first-boot.dts
+"$dtc" -q -I dts -O dtb /tmp/f429-first-boot.dts -o /tmp/f429-first-boot.dtb
+sha256sum /tmp/f429-first-boot.dtb
+```
+
+**Условия сеанса.** До передачи управления были проверены резервные копии внутреннего окна SRAM и внешнего банка, затем оба загруженных образа прочитаны обратно. Настроены PA9 AF7, USART1 BRR=139 при PCLK2=16 МГц и исполняемая MPU-область SDRAM размером 8 МиБ. Стартовали из Thread mode с r0=0, r1=0xffffffff, r2=0x902f0000, MSP=0x20001000, Thumb PC=0x90000000, PRIMASK=1. Приём на Windows — 115200 8N1.
+
+Через 45 секунд отладчик остановил ядро в обработчике периодического таймера (PC=0x9003fee4, VTOR=0x9030c400). Последняя полученная строка приведена выше. Этот прогон подтверждает раннюю загрузку. Образ собран без initramfs. Холодный старт, /init и команда uname -r остаются отдельной проверкой TC-04.
+
+После записи журнала OpenOCD восстановил и побайтно сверил 8 МиБ SDRAM со снимком после инициализации FMC и 4 КиБ внутренней SRAM со снимком перед запуском. После системного сброса MCU вернулся в running с FMCEN=0. Flash не программировалась.
