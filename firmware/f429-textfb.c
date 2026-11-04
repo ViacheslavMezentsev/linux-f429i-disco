@@ -99,15 +99,35 @@ static int clear_panel(struct panel *p, struct lcd_colors colors)
 	return ret;
 }
 
+/* All six columns are meaningful for lines, including the normal glyph spacing. */
+static const u8 box_glyph[6][6] = {
+	{0,0,255,0,0,0}, {8,8,248,0,0,0}, {0,0,15,8,8,8},
+	{8,8,8,8,8,8}, {8,8,15,0,0,0}, {0,0,248,8,8,8},
+};
+
+static int box_index(u8 ch)
+{
+	switch (ch) {
+	case LCD_VERT: return 0;
+	case LCD_TR: return 1;
+	case LCD_BL: return 2;
+	case LCD_HORIZ: return 3;
+	case LCD_BR: return 4;
+	case LCD_TL: return 5;
+	default: return -1;
+	}
+}
+
 static void render(u8 *dst, const struct lcd_colors *colors, const u8 *line,
 		   unsigned width, unsigned first, unsigned rows)
 {
 	unsigned y, i, x;
 	for (y = first; y < first + rows; y++) {
 		for (i = 0; i < width; i++) {
-			const u8 *g = glyph[line[i] - ' '];
+			int box = box_index(line[i]);
+			const u8 *g = box < 0 ? glyph[line[i] - ' '] : box_glyph[box];
 			for (x = 0; x < 6; x++) {
-				u16 rgb = x < 5 && (g[x] & BIT(y)) ? colors->fg : colors->bg;
+				u16 rgb = (x < 5 || box >= 0) && (g[x] & BIT(y)) ? colors->fg : colors->bg;
 				*dst++ = rgb >> 8;
 				*dst++ = rgb;
 			}
@@ -220,7 +240,7 @@ static ssize_t text_write(struct fb_info *info, const char __user *buf, size_t l
 			ret = -EFAULT;
 		} else {
 			for (i = 0; i < n; i++)
-				if (chars[i] < 32 || chars[i] > 126) chars[i] = '?';
+				if ((chars[i] < 32 || chars[i] > 126) && box_index(chars[i]) < 0) chars[i] = '?';
 			ret = window(p, col * 6, ((unsigned)*pos / LCD_COLS) * 8, width * 6, lines * 8);
 			if (!ret) ret = draw_blocks(p, chars, width, lines, READ_ONCE(pipeline_rows));
 			if (!ret) {
