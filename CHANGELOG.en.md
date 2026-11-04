@@ -2,6 +2,8 @@
 [Русский](CHANGELOG.md)
 
 ## Unreleased
+Verified ICMP echo over eth0 on Linux 6.14.5 with the LAN8720. Added the diagnostic configuration and Cortex-M receive alignment fix.
+
 The MAC received two frames with verified FCS using PC4/PC5 without board rework.
 
 Sampled PC4 and PC5 before connecting the RMII receive lines.
