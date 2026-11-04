@@ -2,6 +2,8 @@
 [Русский](CHANGELOG.md)
 
 ## Unreleased
+Added a Linux GPIO probe for 5×8 text on the ILI9341. Windows received 36 of 36 ping replies and PG11 retained AF11. Host checks now build the SRAM probe without installing GCC via apt.
+
 Enabled interactive top in the compact BusyBox build. Verified screen refresh, q to exit and shell memory on the STM32 over SSH.
 
 The demo firmware accepts user/user with UID 1000, disables root SSH login and keeps its per-board Ed25519 identity in sector 23. The build produces BIN and Intel HEX images.

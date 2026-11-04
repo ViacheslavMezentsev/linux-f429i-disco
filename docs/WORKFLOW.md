@@ -18,3 +18,5 @@ wsl git diff --summary
 wsl git ls-files --stage
 ```
 Продолжать только после успешной проверки и G. При сбое оставить индекс. Передать владельцу SHA и результаты. После «слил» выполнить git fetch origin, сравнить git rev-parse main origin/main и git ls-remote --symref origin HEAD. Проверить headSha и conclusion конкретного запуска через gh run view RUN_ID --json headSha,conclusion. Если CI ещё не настроен, отметить проверку открытой.
+
+Host checks использует Clang/LLD из ubuntu-24.04 для сборки автономной ARM-пробы. Локальный make check по умолчанию использует GNU Arm. Ограничение job в 5 минут относится к выполнению на раннере; ожидание очереди GitHub учитывается отдельно.
