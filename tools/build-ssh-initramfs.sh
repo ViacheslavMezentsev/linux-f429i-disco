@@ -23,6 +23,10 @@ else
     echo "       $0 --demo built-linux compact-busybox tcc dropbear-src sdk new-output-dir" >&2
     exit 2
 fi
+if [ -n "${LCD_TEXT_SYSROOT:-}" ]; then
+    "$demo" || { echo "LCD_TEXT_SYSROOT requires --demo" >&2; exit 2; }
+    LCD_TEXT_SYSROOT=$(realpath "$LCD_TEXT_SYSROOT")
+fi
 fw=$(realpath "$(dirname "$0")/../firmware")
 test -x "$kernel/usr/gen_init_cpio"
 umask 077
@@ -107,6 +111,14 @@ EOF
 else
     printf 'file /etc/dropbear/hostkey %s 0600 0 0\n' "$hostkey" >> archive.list
     printf 'file /root/.ssh/authorized_keys %s 0600 0 0\n' "$authorized" >> archive.list
+fi
+if [ -n "${LCD_TEXT_SYSROOT:-}" ]; then
+    arm-linux-gcc --sysroot="$LCD_TEXT_SYSROOT" -I"$fw" -Os -static \
+        -ffunction-sections -fdata-sections -Wl,--gc-sections,-elf2flt=-s8192 \
+        "$fw/../tools/lcd-text.c" -o lcd-text
+    sed '/^inetd /i /bin/lcd-text --init' "$fw/ssh-init" > lcd-init
+    sed -i 's|^file /init [^ ]* |file /init lcd-init |' archive.list
+    echo 'file /bin/lcd-text lcd-text 0755 0 0' >> archive.list
 fi
 for applet in mount mkdir inetd sh uname cat sha256sum; do
     echo "slink /bin/$applet busybox 0777 0 0" >> archive.list

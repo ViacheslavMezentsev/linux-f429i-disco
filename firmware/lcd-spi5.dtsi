@@ -1,0 +1,7 @@
+/* Append after lan8720.dtsi. Preserve PA1 and PG11 for RMII. */
+&{/soc/spi@40015000} { status = "okay"; };
+&{/soc/spi@40015000/l3gd20@0} { status = "disabled"; };
+&{/soc/spi@40015000/display@1} {
+	compatible = "disco,ili9341-text";
+	/delete-property/ spi-3wire;
+};
