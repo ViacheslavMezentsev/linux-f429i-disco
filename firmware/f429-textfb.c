@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0
 /* Fixed MB1075 B-01 SPI5 text framebuffer, TC-15. */
+#include <linux/completion.h>
 #include <linux/delay.h>
 #include <linux/fb.h>
 #include <linux/gpio/consumer.h>
@@ -14,6 +15,15 @@
 #define FILL_ROWS 8
 #define FILL_BYTES (WIDTH * FILL_ROWS * 2)
 static_assert(HEIGHT % FILL_ROWS == 0);
+
+/* Compare submission strategies without changing the bus clock or pixel format. */
+static bool batch_fill = true;
+module_param(batch_fill, bool, 0644);
+MODULE_PARM_DESC(batch_fill, "Submit fill transfers in groups of eight");
+
+static unsigned int pipeline_rows;
+module_param(pipeline_rows, uint, 0644);
+MODULE_PARM_DESC(pipeline_rows, "Text DMA buffers: 4 or 8 scanlines each, otherwise synchronous");
 
 struct panel {
 	struct spi_device *spi;
@@ -52,13 +62,36 @@ static void pixel(struct panel *p, unsigned x, u16 color)
 	p->scan[2*x+1] = color;
 }
 
+static int fill_pixels(struct panel *p)
+{
+	enum { batch = 8, blocks = HEIGHT / FILL_ROWS };
+	struct spi_transfer *xfers = NULL;
+	unsigned i;
+	int ret = 0;
+
+	if (READ_ONCE(batch_fill))
+		xfers = kcalloc(batch, sizeof(*xfers), GFP_KERNEL);
+	if (!xfers) {
+		for (i = 0; !ret && i < blocks; i++)
+			ret = spi_write(p->spi, p->scan, FILL_BYTES);
+		return ret;
+	}
+	for (i = 0; i < batch; i++) {
+		xfers[i].tx_buf = p->scan;
+		xfers[i].len = FILL_BYTES;
+	}
+	for (i = 0; !ret && i < blocks; i += batch)
+		ret = spi_sync_transfer(p->spi, xfers, min_t(unsigned, batch, blocks - i));
+	kfree(xfers);
+	return ret;
+}
+
 static int clear_panel(struct panel *p, struct lcd_colors colors)
 {
 	int ret = window(p, 0, 0, WIDTH, HEIGHT);
-	unsigned x, y;
+	unsigned x;
 	for (x = 0; x < WIDTH * FILL_ROWS; x++) pixel(p, x, colors.bg);
-	for (y = 0; !ret && y < HEIGHT; y += FILL_ROWS)
-		ret = spi_write(p->spi, p->scan, FILL_BYTES);
+	if (!ret) ret = fill_pixels(p);
 	if (!ret) {
 		p->colors = colors;
 		memset(p->cells, ' ', sizeof(p->cells));
@@ -66,18 +99,88 @@ static int clear_panel(struct panel *p, struct lcd_colors colors)
 	return ret;
 }
 
-static int draw(struct panel *p, unsigned pos, const u8 *text, unsigned n)
+static void render(u8 *dst, const struct lcd_colors *colors, const u8 *line,
+		   unsigned width, unsigned first, unsigned rows)
 {
 	unsigned y, i, x;
-	int ret = window(p, (pos % LCD_COLS)*6, (pos / LCD_COLS)*8, n*6, 8);
-	for (y = 0; !ret && y < 8; y++) {
-		for (i = 0; i < n; i++) {
-			const u8 *g = glyph[text[i]-' '];
-			for (x = 0; x < 6; x++)
-				pixel(p, i*6+x, x < 5 && (g[x] & BIT(y)) ?
-				      p->colors.fg : p->colors.bg);
+	for (y = first; y < first + rows; y++) {
+		for (i = 0; i < width; i++) {
+			const u8 *g = glyph[line[i] - ' '];
+			for (x = 0; x < 6; x++) {
+				u16 rgb = x < 5 && (g[x] & BIT(y)) ? colors->fg : colors->bg;
+				*dst++ = rgb >> 8;
+				*dst++ = rgb;
+			}
 		}
-		ret = spi_write(p->spi, p->scan, n*12);
+	}
+}
+
+struct slot {
+	struct spi_message msg;
+	struct spi_transfer xfer;
+	struct completion done;
+	bool pending;
+};
+
+static void sent(void *ctx)
+{
+	complete(ctx);
+}
+
+static int join(struct slot *slot)
+{
+	if (!slot->pending) return 0;
+	wait_for_completion(&slot->done);
+	slot->pending = false;
+	return slot->msg.status;
+}
+
+/* One rectangular window stays open while the SPI queue consumes the blocks. */
+static int draw_blocks(struct panel *p, const u8 *text, unsigned width,
+		       unsigned lines, unsigned rows)
+{
+	struct slot *slots = NULL;
+	u8 *buf[2] = { p->scan, NULL };
+	unsigned block, total;
+	int ret = 0;
+	if (rows == 4 || rows == 8) {
+		slots = kcalloc(2, sizeof(*slots), GFP_KERNEL);
+		if (!slots) return -ENOMEM;
+		buf[1] = rows == 4 ? p->scan + FILL_BYTES / 2 : kmalloc(FILL_BYTES, GFP_KERNEL);
+		if (!buf[1]) { kfree(slots); return -ENOMEM; }
+		for (block = 0; block < 2; block++) {
+			struct slot *s = &slots[block];
+			init_completion(&s->done);
+			spi_message_init(&s->msg);
+			s->msg.complete = sent;
+			s->msg.context = &s->done;
+			s->xfer.tx_buf = buf[block];
+			s->xfer.len = width * 12 * rows;
+			spi_message_add_tail(&s->xfer, &s->msg);
+		}
+	} else {
+		rows = 8;
+	}
+	total = lines * 8 / rows;
+	for (block = 0; !ret && block < total; block++) {
+		unsigned idx = slots ? block % 2 : 0;
+		unsigned y = block * rows;
+		if (slots && (ret = join(&slots[idx]))) break;
+		render(buf[idx], &p->colors, text + (y / 8) * width, width, y % 8, rows);
+		if (slots) {
+			ret = spi_async(p->spi, &slots[idx].msg);
+			slots[idx].pending = !ret;
+		} else {
+			ret = spi_write(p->spi, buf[0], width * 12 * rows);
+		}
+	}
+	if (slots) {
+		for (block = 0; block < 2; block++) {
+			int status = join(&slots[block]);
+			if (!ret) ret = status;
+		}
+		if (rows == 8) kfree(buf[1]);
+		kfree(slots);
 	}
 	return ret;
 }
@@ -104,16 +207,30 @@ static ssize_t text_write(struct fb_info *info, const char __user *buf, size_t l
 	len = min_t(size_t, len, sizeof(p->cells) - *pos);
 	mutex_lock(&p->lock);
 	while (done < len) {
-		size_t n = min_t(size_t, len - done, LCD_COLS - ((unsigned)*pos % LCD_COLS));
-		size_t i;
-		if (copy_from_user(line, buf + done, n)) { ret = -EFAULT; break; }
-		for (i = 0; i < n; i++)
-			if (line[i] < 32 || line[i] > 126) line[i] = '?';
-		ret = draw(p, *pos, line, n);
+		unsigned col = (unsigned)*pos % LCD_COLS;
+		unsigned width = min_t(size_t, len - done, LCD_COLS - col);
+		unsigned lines = width == LCD_COLS ? (len - done) / LCD_COLS : 1;
+		unsigned n = width * lines, i;
+		u8 *chars = line;
+		if (lines > 1) {
+			chars = kmalloc(n, GFP_KERNEL);
+			if (!chars) { ret = -ENOMEM; break; }
+		}
+		if (copy_from_user(chars, buf + done, n)) {
+			ret = -EFAULT;
+		} else {
+			for (i = 0; i < n; i++)
+				if (chars[i] < 32 || chars[i] > 126) chars[i] = '?';
+			ret = window(p, col * 6, ((unsigned)*pos / LCD_COLS) * 8, width * 6, lines * 8);
+			if (!ret) ret = draw_blocks(p, chars, width, lines, READ_ONCE(pipeline_rows));
+			if (!ret) {
+				memcpy(p->cells + *pos, chars, n);
+				done += n;
+				*pos += n;
+			}
+		}
+		if (chars != line) kfree(chars);
 		if (ret) break;
-		memcpy(p->cells + *pos, line, n);
-		done += n;
-		*pos += n;
 	}
 	mutex_unlock(&p->lock);
 	return done ? (ssize_t)done : ret;
