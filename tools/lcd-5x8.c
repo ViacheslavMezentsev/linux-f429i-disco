@@ -100,23 +100,23 @@ int main(void)
     command(0xf6, (uint8_t[]){1,0,0}, 3); /* Internal display clock, MCU memory writes */
     command(0x36, (uint8_t[]){0x48}, 1);
     command(0x3a, (uint8_t[]){0x55}, 1); /* RGB565 */
-    command(0x29, NULL, 0);
     static const char message[] = "LINUX 5X8";
-    enum { width = 6*(sizeof(message)-1)+4, height = 12,
-           left = (240-width)/2, top = (320-height)/2 };
-    command(0x2a, (uint8_t[]){0,left,0,left+width-1}, 4);
-    command(0x2b, (uint8_t[]){0,top,0,top+height-1}, 4);
+    enum { width = 240, height = 320, text_width = 6*(sizeof(message)-1),
+           left = (width-text_width)/2, top = (height-8)/2 };
+    command(0x2a, (uint8_t[]){0,0,0,width-1}, 4);
+    command(0x2b, (uint8_t[]){0,0,(height-1)>>8,(height-1)&255}, 4);
     command(0x2c, NULL, 0);
     set(select_fd, 0, 0);
     for (unsigned y = 0; y < height; y++) {
         for (unsigned x = 0; x < width; x++) {
-            int on = x >= 2 && x < width-2 && y >= 2 && y < 10
-                     && pixel(message[(x-2)/6], (x-2)%6, y-2);
+            int on = x >= left && x < left+text_width && y >= top && y < top+8
+                     && pixel(message[(x-left)/6], (x-left)%6, y-top);
             byte_out(on ? 0xff : 0);
             byte_out(on ? 0xff : 0);
         }
     }
     set(select_fd, 1, 0);
+    command(0x29, NULL, 0); /* Display on after every GRAM pixel is defined. */
     close(serial); close(dc_fd); close(select_fd); close(gyro_cs);
     puts("ILI9341 wrote LINUX 5X8");
     return 0;
