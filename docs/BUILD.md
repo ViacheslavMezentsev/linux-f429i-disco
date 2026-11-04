@@ -37,3 +37,17 @@ CubeProgrammer 2.23.0, ST-LINK V2J48S0, 2.90 В. На 4000 кГц цель не 
 
 ### Внешний ST-LINK и VCOM, 04.11.2026
 На MB1075 B-01 после снятия CN4 внешний ST-LINK (V2J45M31) подключён к PA13/PA14 на P1. Windows OpenOCD 0.12.0 проверял по 100 чтений DBGMCU_IDCODE на сеанс. На 950 кГц прошли 3/3 сеансов, на 1800 кГц — 2/3 и затем 6/10, на 4000 кГц — 0/3. При запросе 8000 кГц OpenOCD выбрал 4000 кГц, ещё 0/3. На 950 кГц загружена проба в SRAM. COM21, 115200 8N1, принял с USART1_TX (PA9) строку F429-B01 USART1 PA9 VCOM 74AC и CRLF, точное совпадение 31 байта. Все 4096 байт внутренней SRAM восстановлены и сверены до сброса, затем ядро вернулось в running.
+
+### Пробная сборка Linux 6.14.5 в WSL
+
+Для оценки размера собраны no-MMU xipImage (2 239 112 байт) и штатный DTB (19 564 байта) без initramfs. Исходный архив с kernel.org проверен по SHA-256. Ниже команды для каталога с распакованными исходниками linux-6.14.5 и GNU Arm Embedded GCC 10.2.1.
+
+```sh
+export ARCH=arm CROSS_COMPILE=arm-none-eabi-
+curl -fsSL https://raw.githubusercontent.com/buildroot/buildroot/6824cf90ae0fb88c63f8f2f8cfde0ee105eb3317/board/stmicroelectronics/stm32f429-disco/linux.config -o .config
+scripts/config --set-str INITRAMFS_SOURCE "" --set-val XIP_PHYS_ADDR 0x90000000 --set-val DRAM_BASE 0x90300000 --set-val DRAM_SIZE 0x00500000
+make olddefconfig
+make -j8 xipImage st/stm32f429-disco.dtb
+```
+
+Артефакты находятся в arch/arm/boot/xipImage и arch/arm/boot/dts/st/stm32f429-disco.dtb. Рабочие копии текущей сборки сохранены в out/linux-6.14.5-smoke.{xipImage,dtb,config}. Штатный DTB содержит memory@90000000 размером 8 МиБ и stdout-path serial0:115200n8. Экспериментальная конфигурация выделяет ядру рабочую RAM с 0x90300000 размером 5 МиБ. Перед загрузкой определить единое разбиение для XIP, RAM и DTB, учесть переназначение FMC из аппаратного окна 0xD0000000 и добавить минимальный initramfs. Доказательством старта служит вывод на USART1.
