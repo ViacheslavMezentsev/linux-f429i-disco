@@ -2,6 +2,8 @@
 [Русский](CHANGELOG.md)
 
 ## Unreleased
+The demo firmware accepts user/user with UID 1000, disables root SSH login and keeps its per-board Ed25519 identity in sector 23. The build produces BIN and Intel HEX images.
+
 Cold boot now provides compact BusyBox and native TCC in /bin. Verified on-board Hello World compilation over SSH and a 16 KiB SCP round trip.
 
 The flash bootloader now selects 168 MHz. Verified interactive SSH and a 16 KiB SCP round trip after both a push-button reset and a full power cycle.
