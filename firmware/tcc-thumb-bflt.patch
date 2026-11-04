@@ -1,0 +1,46 @@
+--- a/tcc.h
++++ b/tcc.h
+@@ -53 +52,0 @@
+-# include <sys/ucontext.h>
+@@ -182 +180,0 @@
+-#  define TCC_IS_NATIVE
+@@ -184 +181,0 @@
+-#  define TCC_IS_NATIVE
+@@ -186 +182,0 @@
+-#  define TCC_IS_NATIVE
+@@ -303 +299 @@
+-#define VSTACK_SIZE         256
++#define VSTACK_SIZE         64
+@@ -307 +303 @@
+-#define TOK_HASH_SIZE       8192 /* must be a power of two */
++#define TOK_HASH_SIZE       512 /* must be a power of two */
+--- a/arm-gen.c
++++ b/arm-gen.c
+@@ -247 +247 @@
+-void o(uint32_t i)
++void o(unsigned int i)
+@@ -1228,0 +1229,4 @@
++/* The lab bFLT writer patches each literal address and direct call. */
++static struct { unsigned adr, call, data; } puts_sites[32];
++static unsigned puts_count;
++
+@@ -1230,0 +1235,19 @@
++  if (nb_args == 1 && (vtop[-1].r & VT_SYM) &&
++      !strcmp(get_tok_str(vtop[-1].sym->v, NULL), "puts")) {
++    if (puts_count == 32 || (vtop->r & (VT_VALMASK|VT_SYM|VT_LVAL)) != (VT_CONST|VT_SYM))
++      tcc_error("puts needs a static string in this build");
++    Elf32_Sym *sym = (Elf32_Sym *)symtab_section->data + vtop->sym->c;
++    unsigned off = sym->st_value + vtop->c.ul;
++    if (sym->st_shndx != data_section->sh_num || off >= data_section->data_offset ||
++        !memchr(data_section->data + off, 0, data_section->data_offset - off))
++      tcc_error("puts argument outside string data");
++    puts_sites[puts_count].data = off;
++    puts_sites[puts_count].adr = ind;
++    ot(0xf20f); ot(0x0000); /* adr.w r0, string */
++    ot(0xb500); /* save lr and align sp for the call */
++    puts_sites[puts_count++].call = ind;
++    ot(0xf000); ot(0xf800); /* bl puts */
++    ot(0xbc08); ot(0x469e); /* pop {r3}; mov lr,r3 */
++    vtop -= 2;
++    return;
++  }
